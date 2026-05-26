@@ -1,39 +1,19 @@
-import { getDb } from "@/db";
-import { domains, mailboxes, users } from "@/db/schema";
-import { hashPassword } from "@/lib/auth/password";
-import { newId } from "@/lib/ids";
+import {
+	demoCredentials,
+	ensureDemoDomain,
+	ensureDemoMailboxes,
+	ensureDemoUser,
+	insertDemoMessages,
+} from "@/lib/seed-utils";
 
 /** Dev-only seed without Cloudflare API (domain must be onboarded separately). */
-export async function seedDemoData(env: CloudflareEnv): Promise<void> {
-	const db = getDb(env);
-	const userId = newId("usr");
-	const domainId = newId("dom");
-	const mailboxId = newId("mbx");
+export async function seedDemoData(env: CloudflareEnv): Promise<{ messageCount: number }> {
+	const user = await ensureDemoUser(env);
+	const domain = await ensureDemoDomain(env, user.id);
+	const mailboxMap = await ensureDemoMailboxes(env, user.id, domain.id);
+	const messageCount = await insertDemoMessages(env, user.id, mailboxMap);
 
-	await db.insert(users).values({
-		id: userId,
-		email: "admin@example.com",
-		passwordHash: hashPassword("demo-password-change-me"),
-		name: "Demo User",
-	});
+	console.info("Seeded demo user:", demoCredentials);
 
-	await db.insert(domains).values({
-		id: domainId,
-		userId,
-		hostname: "example.com",
-		zoneId: "00000000000000000000000000000000",
-		status: "active",
-		routingEnabled: true,
-		sendingEnabled: true,
-	});
-
-	await db.insert(mailboxes).values({
-		id: mailboxId,
-		userId,
-		domainId,
-		localPart: "support",
-		displayName: "Support",
-	});
-
-	console.info("Seeded demo user:", { email: "admin@example.com", password: "demo-password-change-me" });
+	return { messageCount };
 }

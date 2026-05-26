@@ -10,6 +10,7 @@ import {
 	deleteSendingSubdomain,
 	type CfDnsRecord,
 } from "@/lib/cloudflare-api";
+import { deleteEmailRoutingRulesForDomain } from "@/lib/domains/cloudflare-cleanup";
 import { provisionDomainOnCloudflare } from "@/lib/domains/provision";
 
 export type DomainDnsView = {
@@ -92,6 +93,12 @@ export async function removeDomainForUser(
 		.where(and(eq(domains.id, domainId), eq(domains.userId, userId)))
 		.limit(1);
 	if (!domain) throw new Error("Domain not found");
+
+	try {
+		await deleteEmailRoutingRulesForDomain(env, domain.zoneId, domain.hostname);
+	} catch (err) {
+		console.warn("deleteEmailRoutingRulesForDomain", err);
+	}
 
 	if (domain.routingEnabled) {
 		try {
